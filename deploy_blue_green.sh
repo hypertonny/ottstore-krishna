@@ -8,7 +8,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 SLOT_FILE="$PROJECT_DIR/active_slot.txt"
-UPSTREAM_FILE="$PROJECT_DIR/nginx/active_upstream.conf"
+UPSTREAM_FILE="$PROJECT_DIR/nginx/upstream.conf"
 
 # Read active slot (default to blue)
 if [ -f "$SLOT_FILE" ]; then
@@ -71,7 +71,7 @@ if [ "$HEALTHY" -eq 1 ]; then
     echo "--- [4/5] Health checks PASSED. Switching traffic to $TARGET_SLOT ---"
     
     # Update active upstream pointer
-    echo "server ${TARGET_SERVICE}:80;" > "$UPSTREAM_FILE"
+    printf "upstream backend_app {\n    server %s:80;\n}\n" "${TARGET_SERVICE}" > "$UPSTREAM_FILE"
     
     # Reload Nginx configuration instantaneously (0 downtime hot-reload)
     docker exec ott_nginx nginx -s reload
