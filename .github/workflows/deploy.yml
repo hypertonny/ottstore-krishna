@@ -1,4 +1,4 @@
-name: OTT Store CI/CD (Zero-Downtime Blue-Green)
+name: OTT Store CI/CD (Build & Deploy)
 
 on:
   push:
@@ -25,12 +25,12 @@ jobs:
           find _public_html -type f -name "*.php" -exec php -l {} \;
 
   deploy:
-    name: Automated Blue-Green Deployment
+    name: Automated Docker Build & Start
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Execute Blue-Green Deployment on VPS
+      - name: Pull and Deploy on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -42,5 +42,16 @@ jobs:
             cd /opt/ott-store
             git fetch origin main
             git reset --hard origin/main
-            chmod +x deploy_blue_green.sh
-            bash deploy_blue_green.sh
+            docker compose down --remove-orphans || true
+            docker compose up -d --build
+            echo "Waiting for services to become healthy..."
+            for i in {1..15}; do
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' ott_web 2>/dev/null || echo "starting")
+                echo "Health check attempt $i: $STATUS"
+                if [ "$STATUS" == "healthy" ]; then
+                    echo "Deployment is HEALTHY and OPERATIONAL!"
+                    break
+                fi
+                sleep 2
+            done
+            docker compose ps

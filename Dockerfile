@@ -33,16 +33,40 @@ RUN mkdir -p /etc/ssl/certs /etc/ssl/private && \
         -out /etc/ssl/certs/apache-selfsigned.crt \
         -subj "/C=IN/ST=Maharashtra/L=Mumbai/O=OTTStore/CN=ottbuy.io"
 
-# Configure Apache VirtualHost for Backend Service
+# Configure HTTP VirtualHost with automatic 301 redirection to HTTPS
 RUN echo '<VirtualHost *:80>\n\
     ServerAdmin webmaster@ottbuy.io\n\
+    ServerName ottbuy.io\n\
+    ServerAlias www.ottbuy.io\n\
     DocumentRoot /var/www/html\n\
+    RewriteEngine On\n\
+    RewriteCond %{HTTPS} off\n\
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]\n\
     <Directory /var/www/html/>\n\
         Options -Indexes +FollowSymLinks\n\
         AllowOverride All\n\
         Require all granted\n\
     </Directory>\n\
 </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+
+# Configure SSL VirtualHost pointing to Let's Encrypt certificates
+RUN echo '<IfModule mod_ssl.c>\n\
+<VirtualHost _default_:443>\n\
+    ServerAdmin webmaster@ottbuy.io\n\
+    ServerName ottbuy.io\n\
+    ServerAlias www.ottbuy.io\n\
+    DocumentRoot /var/www/html\n\
+    SSLEngine on\n\
+    SSLCertificateFile /etc/letsencrypt/live/ottbuy.io/fullchain.pem\n\
+    SSLCertificateKeyFile /etc/letsencrypt/live/ottbuy.io/privkey.pem\n\
+    <Directory /var/www/html/>\n\
+        Options -Indexes +FollowSymLinks\n\
+        AllowOverride All\n\
+        Require all granted\n\
+    </Directory>\n\
+</VirtualHost>\n\
+</IfModule>' > /etc/apache2/sites-available/default-ssl.conf \
+    && a2ensite default-ssl
 
 # Security-hardened Apache configuration
 RUN echo '<Directory /var/www/html/>\n\
@@ -68,5 +92,5 @@ ServerTokens Prod' > /etc/apache2/conf-available/security-custom.conf \
 # Set working directory
 WORKDIR /var/www/html
 
-EXPOSE 80
+EXPOSE 80 443
 

@@ -21,71 +21,34 @@ services:
       retries: 10
       start_period: 15s
 
-  web_blue:
+  web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ott_web_blue
-    restart: unless-stopped
-    environment:
-      DB_HOST: "db"
-      DB_NAME: "u168620846_ott"
-      DB_USER: "u168620846_ott"
-      DB_PASS: "4uQ3=1+v>&"
-    volumes:
-      - ./_public_html:/var/www/html
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - ott_internal
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-
-  web_green:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ott_web_green
-    restart: unless-stopped
-    environment:
-      DB_HOST: "db"
-      DB_NAME: "u168620846_ott"
-      DB_USER: "u168620846_ott"
-      DB_PASS: "4uQ3=1+v>&"
-    volumes:
-      - ./_public_html:/var/www/html
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - ott_internal
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-
-  nginx:
-    image: nginx:alpine
-    container_name: ott_nginx
+    container_name: ott_web
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      DB_HOST: "db"
+      DB_NAME: "u168620846_ott"
+      DB_USER: "u168620846_ott"
+      DB_PASS: "4uQ3=1+v>&"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/upstream.conf:/etc/nginx/conf.d/upstream.conf:rw
+      - ./_public_html:/var/www/html
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - web_blue
+      db:
+        condition: service_healthy
     networks:
       - ott_internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -k https://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   ott_db_data:
