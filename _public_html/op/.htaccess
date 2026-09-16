@@ -1,0 +1,2 @@
+# Deny all access to legacy backup directory
+Require all denied

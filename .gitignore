@@ -1,0 +1,19 @@
+# Environment configuration (use .env.example as template)
+.env
+
+# Logs and runtime artifacts
+*.log
+error_log
+_public_html/admin/error_log
+active_slot.txt
+
+# Temp & System files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+scratch/
+
+# IDE files
+.vscode/
+.idea/

@@ -1,0 +1,95 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: ott_mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: "SuperSecureRootPassword2026!"
+      MYSQL_DATABASE: "u168620846_ott"
+      MYSQL_USER: "u168620846_ott"
+      MYSQL_PASSWORD: "4uQ3=1+v>&"
+    volumes:
+      - ott_db_data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ott_internal
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -pSuperSecureRootPassword2026! || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  web_blue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ott_web_blue
+    restart: unless-stopped
+    environment:
+      DB_HOST: "db"
+      DB_NAME: "u168620846_ott"
+      DB_USER: "u168620846_ott"
+      DB_PASS: "4uQ3=1+v>&"
+    volumes:
+      - ./_public_html:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ott_internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  web_green:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ott_web_green
+    restart: unless-stopped
+    environment:
+      DB_HOST: "db"
+      DB_NAME: "u168620846_ott"
+      DB_USER: "u168620846_ott"
+      DB_PASS: "4uQ3=1+v>&"
+    volumes:
+      - ./_public_html:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ott_internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  nginx:
+    image: nginx:alpine
+    container_name: ott_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/active_upstream.conf:/etc/nginx/conf.d/active_upstream.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - web_blue
+    networks:
+      - ott_internal
+
+volumes:
+  ott_db_data:
+
+networks:
+  ott_internal:
+    driver: bridge

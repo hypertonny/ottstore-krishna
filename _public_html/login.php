@@ -1,0 +1,205 @@
+<?php
+require_once __DIR__ . "/auth.php";
+
+require_once __DIR__ . "/rate_limiter.php";
+
+if (isset($_SESSION['user_id'])) {
+    header("Location: profile.php");
+    exit();
+}
+
+$error = null;
+$rateLimit = isRateLimited($conn, 'user_login', 5, 15);
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if ($rateLimit['limited']) {
+        $error = "Too many failed login attempts. For your security, this IP is temporarily throttled. Please try again in " . $rateLimit['retry_after_minutes'] . " minutes.";
+    } else {
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        if (empty($email) || empty($password)) {
+            $error = "Please fill in all fields.";
+        } else {
+            $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($row = $result->fetch_assoc()) {
+                if (password_verify($password, $row['password'])) {
+                    clearFailedAttempts($conn, 'user_login');
+                    $_SESSION['auth'] = true;
+                    $_SESSION['user_id'] = $row['id'];
+                    $_SESSION['username'] = $row['username'];
+                    $_SESSION['email'] = $row['email'];
+                    header("Location: profile.php");
+                    exit();
+                } else {
+                    recordFailedAttempt($conn, 'user_login');
+                    $rem = max(0, 5 - ($rateLimit['attempts'] + 1));
+                    $error = "Incorrect password! Please try again." . ($rem > 0 ? " ($rem attempts remaining before lockout)" : " Account temporarily locked.");
+                }
+            } else {
+                recordFailedAttempt($conn, 'user_login');
+                $rem = max(0, 5 - ($rateLimit['attempts'] + 1));
+                $error = "No account found with this email address." . ($rem > 0 ? " ($rem attempts remaining before lockout)" : " Account temporarily locked.");
+            }
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Customer Login | OTT STORE PREMIUM</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 & FontAwesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-body: #090d16;
+            --bg-card: #111827;
+            --border-card: rgba(255, 255, 255, 0.08);
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+
+        .auth-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.6), 0 0 32px -4px rgba(99, 102, 241, 0.15);
+        }
+
+        .brand-icon {
+            width: 52px;
+            height: 52px;
+            background: var(--accent-gradient);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.5rem;
+            margin: 0 auto 16px auto;
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .form-control {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 12px;
+        }
+
+        .form-control:focus {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: #818cf8;
+            color: #fff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-submit {
+            background: var(--accent-gradient);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            padding: 13px;
+            border-radius: 12px;
+            width: 100%;
+            font-size: 1rem;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-card">
+    <div class="text-center mb-4">
+        <a href="index.php" class="text-decoration-none">
+            <div class="brand-icon">
+                <i class="fa-solid fa-play"></i>
+            </div>
+        </a>
+        <h3 class="fw-bold text-white mb-1">Welcome Back</h3>
+        <p class="text-secondary small mb-0">Sign in to manage your OTT subscriptions</p>
+    </div>
+
+    <?php if ($error): ?>
+        <div class="alert alert-danger py-2.5 px-3 small rounded-3 mb-3">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i> <?= htmlspecialchars($error) ?>
+        </div>
+    <?php endif; ?>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label text-secondary small fw-semibold">Email Address</label>
+            <div class="input-group">
+                <input type="email" class="form-control" name="email" placeholder="name@example.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label text-secondary small fw-semibold mb-0">Password</label>
+                <a href="forgot_password.php" class="text-indigo-400 small text-decoration-none" style="color: #818cf8; font-size: 0.8rem;">Forgot?</a>
+            </div>
+            <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <div class="form-check mb-4">
+            <input type="checkbox" class="form-check-input" id="remember" checked>
+            <label class="form-check-label text-secondary small" for="remember">Keep me logged in</label>
+        </div>
+
+        <button type="submit" class="btn-submit mb-3">
+            <span>Sign In</span>
+            <i class="fa-solid fa-arrow-right ms-1"></i>
+        </button>
+
+        <div class="text-center">
+            <small class="text-secondary">Don't have an account? <a href="register.php" style="color: #a5b4fc; font-weight: 600;" class="text-decoration-none">Register here</a></small>
+        </div>
+
+        <div class="text-center mt-3 pt-3 border-top border-secondary border-opacity-25">
+            <a href="index.php" class="text-secondary small text-decoration-none">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Home
+            </a>
+        </div>
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+name: OTT Store CI/CD (Zero-Downtime Blue-Green)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint & Code Integrity Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, curl, gd, mbstring, zip
+
+      - name: Validate PHP Syntax Across Project
+        run: |
+          echo "Validating syntax across all PHP scripts..."
+          find _public_html -type f -name "*.php" -exec php -l {} \;
+
+  deploy:
+    name: Automated Blue-Green Deployment
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Execute Blue-Green Deployment on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /opt/ott-store
+            git fetch origin main
+            git reset --hard origin/main
+            chmod +x deploy_blue_green.sh
+            bash deploy_blue_green.sh
