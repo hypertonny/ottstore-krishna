@@ -42,8 +42,7 @@ jobs:
             cd /opt/ott-store
             git fetch origin main
             git reset --hard origin/main
-            docker compose down --remove-orphans || true
-            docker compose up -d --build
+            docker compose up -d --build --remove-orphans
             echo "Waiting for services to become healthy..."
             for i in {1..15}; do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' ott_web 2>/dev/null || echo "starting")
@@ -54,4 +53,6 @@ jobs:
                 fi
                 sleep 2
             done
+            docker image prune -f
             docker compose ps
+
