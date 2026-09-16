@@ -194,5 +194,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 </div>
 
+<script src="dist/js/crafted.js"></script>
 </body>
 </html>
+

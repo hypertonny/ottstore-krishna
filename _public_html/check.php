@@ -233,6 +233,7 @@ if ($availableStock <= 0) {
         displayAmount.innerHTML = "&#8377;" + (count * unitPrice);
     });
 </script>
-
+<script src="dist/js/crafted.js"></script>
 </body>
 </html>
+

@@ -284,6 +284,7 @@ $(document).ready(function () {
     });
 });
 </script>
-
+<script src="dist/js/crafted.js"></script>
 </body>
 </html>
+
